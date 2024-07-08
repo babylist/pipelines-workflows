@@ -20,7 +20,7 @@ on:
       # - A map: "{group: \"ubuntu-runners\", labels: \"ubuntu-20.04-16core\"}"
       runner:
         type: string
-        default: "\"ubuntu-latest\""
+        default: '"ubuntu-latest"'
     secrets:
       PIPELINES_READ_TOKEN:
         required: true
@@ -31,7 +31,7 @@ on:
 
 env:
   PIPELINES_CLI_VERSION: v0.15.1
-  PIPELINES_ACTIONS_VERSION: main
+  PIPELINES_ACTIONS_VERSION: ore/dev-279-support-reading-the-pipelines-configuration-block-from-hcl
   BOILERPLATE_VERSION: v0.5.16
   GRUNTWORK_INSTALLER_VERSION: v0.0.40
 
@@ -165,7 +165,7 @@ jobs:
         if: ${{ steps.gruntwork_context.outputs.action == 'TERRAGRUNT_EXECUTE' }}
         uses: ./pipelines-actions/.github/actions/pipelines-execute
         env:
-          TERRAGRUNT_AUTH_PROVIDER_CMD: 'pipelines auth terragrunt-credentials --ci github-actions --cloud aws --wd .'
+          TERRAGRUNT_AUTH_PROVIDER_CMD: "pipelines auth terragrunt-credentials --ci github-actions --cloud aws --wd ."
         with:
           token: ${{ secrets.PIPELINES_READ_TOKEN }}
           tf_binary: ${{ steps.gruntwork_context.outputs.tf_binary }}
