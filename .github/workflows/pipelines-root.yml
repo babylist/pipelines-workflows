@@ -204,6 +204,48 @@ jobs:
           ref: ${{ env.PIPELINES_ACTIONS_VERSION }}
           token: ${{ steps.pipelines-gruntwork-read-token.outputs.PIPELINES_TOKEN }}
 
+      # STS role session names allow only [\w+=,.@-] and at most 64 characters. On apply, the upstream
+      # script uses the merged PR's base branch as the ref, which for a stacked PR is a feature branch
+      # like "user/topic". Replace it with a version that uses the pushed ref and sanitizes the result.
+      - &patch-role-session-name
+        name: Patch role session name script
+        run: |
+          script=pipelines-actions/.github/actions/pipelines-bootstrap/scripts/generate-role-session-name-and-requesting-pr-number.sh
+          if [[ "$(sha256sum "$script" | cut -d' ' -f1)" != 8bce8156a433f5dfd8d1bc774fcad82c64dad2b846cb9f0dd0967a0654e51a23 ]]; then
+            echo "::error::$script changed upstream; review it and update this patch"
+            exit 1
+          fi
+          cat > "$script" <<'EOF'
+          #!/usr/bin/env bash
+
+          if [[ $TG_CMD =~ ^(plan|run-all plan) ]]; then
+              PR_SEARCH="$(gh pr list --search "$COMMIT_SHA" --json author --json mergedBy --json number --json baseRefName --json commits)"
+              PR_NUMBER="$(jq '.[-1].number' <<< "$PR_SEARCH")"
+
+              if [[ $(jq '. == []' <<< "$PR_SEARCH") == 'true' ]]; then
+              SESSION_REQUESTER="PullRequest"
+              SESSION_GIT_REF="PR-$(git rev-parse --short "$COMMIT_SHA")"
+              else
+              SESSION_REQUESTER="$(jq -r ".[0].commits[] | select(.oid == \"$COMMIT_SHA\") | .authors[0].login" <<< "$PR_SEARCH")"
+              SESSION_GIT_REF="PR-$(jq -r '.[0].number' <<< "$PR_SEARCH")"
+              fi
+          else
+              # A commit search also matches later PRs whose branches contain the commit, so prefer the
+              # PR that produced it.
+              PR_SEARCH="$(gh pr list --search "$COMMIT_SHA" --json mergedBy --json number --json mergeCommit --state merged)"
+              PR="$(jq --arg sha "$COMMIT_SHA" 'first(.[] | select(.mergeCommit.oid == $sha)) // .[0]' <<< "$PR_SEARCH")"
+              PR_NUMBER="$(jq '.number' <<< "$PR")"
+
+              SESSION_REQUESTER="$(jq -r '.mergedBy.login' <<< "$PR")"
+              SESSION_GIT_REF="$GITHUB_REF_NAME"
+          fi
+
+          ROLE_SESSION_NAME="$(printf '%s' "$SESSION_REQUESTER-via-GWPipelines@$SESSION_GIT_REF" | tr -c 'A-Za-z0-9+=,.@_-' '-' | cut -c1-64)"
+
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "role_session_name=$ROLE_SESSION_NAME" >> $GITHUB_OUTPUT
+          EOF
+
       - name: Check out repo code
         uses: actions/checkout@v4
         with:
@@ -396,6 +438,8 @@ jobs:
           ref: ${{ env.PIPELINES_ACTIONS_VERSION }}
           token: ${{ steps.pipelines-gruntwork-read-token.outputs.PIPELINES_TOKEN }}
 
+      - *patch-role-session-name
+
       - name: Check out repo code
         uses: actions/checkout@v4
         with:
@@ -518,6 +562,8 @@ jobs:
           repository: gruntwork-io/pipelines-actions
           ref: ${{ env.PIPELINES_ACTIONS_VERSION }}
           token: ${{ steps.pipelines-gruntwork-read-token.outputs.PIPELINES_TOKEN }}
+
+      - *patch-role-session-name
 
       - name: Check out repo code
         uses: actions/checkout@v4
