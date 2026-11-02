@@ -204,6 +204,16 @@ jobs:
           ref: ${{ env.PIPELINES_ACTIONS_VERSION }}
           token: ${{ steps.pipelines-gruntwork-read-token.outputs.PIPELINES_TOKEN }}
 
+      # STS role session names allow only [\w+=,.@-]. On apply, the upstream script uses the merged PR's
+      # base branch as the ref, which for a stacked PR is a feature branch like "user/topic". Use the
+      # pushed ref instead, with any disallowed characters replaced.
+      - &patch-role-session-name
+        name: Use pushed ref in role session name
+        run: |
+          script=pipelines-actions/.github/actions/pipelines-bootstrap/scripts/generate-role-session-name-and-requesting-pr-number.sh
+          sed -i 's|SESSION_GIT_REF=.*baseRefName.*|SESSION_GIT_REF="${GITHUB_REF_NAME//[^A-Za-z0-9+=,.@_-]/-}"|' "$script"
+          grep -qF 'GITHUB_REF_NAME' "$script" || { echo "::error::$script changed upstream; patch did not apply"; exit 1; }
+
       - name: Check out repo code
         uses: actions/checkout@v4
         with:
@@ -396,6 +406,8 @@ jobs:
           ref: ${{ env.PIPELINES_ACTIONS_VERSION }}
           token: ${{ steps.pipelines-gruntwork-read-token.outputs.PIPELINES_TOKEN }}
 
+      - *patch-role-session-name
+
       - name: Check out repo code
         uses: actions/checkout@v4
         with:
@@ -518,6 +530,8 @@ jobs:
           repository: gruntwork-io/pipelines-actions
           ref: ${{ env.PIPELINES_ACTIONS_VERSION }}
           token: ${{ steps.pipelines-gruntwork-read-token.outputs.PIPELINES_TOKEN }}
+
+      - *patch-role-session-name
 
       - name: Check out repo code
         uses: actions/checkout@v4
