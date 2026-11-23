@@ -133,7 +133,11 @@ jobs:
         uses: ./pipelines-actions/.github/actions/pipelines-preflight-action
         with:
           IS_ROOT: "true"
-          PIPELINES_READ_TOKEN: ${{ secrets.PIPELINES_READ_TOKEN }}
+          # Left blank so an expired PIPELINES_READ_TOKEN doesn't fail preflight while the Gruntwork.io
+          # App supplies the read tokens. The preflight script skips the PAT checks when this is blank
+          # and both read tokens below are set. If the App is down, those two read tokens are the PAT
+          # itself (the credential steps' fallback), so preflight still validates it.
+          PIPELINES_READ_TOKEN: ""
           INFRA_ROOT_WRITE_TOKEN: ${{ steps.pipelines-infra-root-write-token.outputs.PIPELINES_TOKEN }}
           ORG_REPO_ADMIN_TOKEN:  ${{ steps.pipelines-org-repo-admin-token.outputs.PIPELINES_TOKEN }}
           PIPELINES_GRUNTWORK_READ_TOKEN: ${{ steps.pipelines-gruntwork-read-token.outputs.PIPELINES_TOKEN }}
